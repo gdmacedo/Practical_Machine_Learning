@@ -1,0 +1,218 @@
+---
+title: "Practical Machine Learning<br />Peer Assessment"
+author: "Macedo, Glener Diniz"
+date: "Saturday, November, 21, 2015 : São Paulo - Brasil"
+css: RPubs.css
+---
+###### Course: {.course}
+###### University: {.university}
+### Practical Machine Learning {.courcename}
+### Johns Hopkins University {.universityname}
+
+# {.logoCurso}
+![logo do Curso](logo.jpg)
+
+# {.logoUniversity}
+![logo da Universidade](LogoUniversidade.png)
+
+# Executive summary {.synopsis}
+# {.synopsisconteudo}
+Since we have a data set with many columns and need to make a class prediction, we decided to implement a model of random forests, there is need for cross-validation or a separate test set to get an unbiased estimate of the error test set . Before applying the data set for our prediction model, we decided to remove all columns that are less than 60% of the populated data, instead of trying filled it with some measure center.
+
+# {.Background}
+# Background
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: (see the section on the Weight Lifting Exercise Dataset).
+
+
+
+# {.corpo}
+# Prepare the environment
+Throughout this analysis, we can find the codes used to generate output information here. When writing code in the document R redial, we will always use echo = TRUE so that someone will be able to read the code. Thus, we set eco equal to TRUE and results equal to a "hold 'as global options for this document.
+### Set the work environment and knitr options
+
+```{r setoptions}
+      rm(list=ls(all=TRUE)) #start with empty workspace
+      Starttime <- Sys.time()
+```
+
+```{r}
+rm(list=ls(all=TRUE)) #start with empty workspace
+startTime <- Sys.time()
+
+library(knitr)
+opts_chunk$set(echo = TRUE, cache= TRUE, results = 'hold')
+```
+#Libraries loading and seeds
+
+Load all libraries used, and setting seed for reproducibility
+```{r}
+library(ElemStatLearn); 
+library(caret); 
+library(rpart); 
+library(randomForest); 
+library(RCurl)
+set.seed(2014)
+```
+# Data
+The data for this project come from this source: -http://groupware.les.inf.puc-rio.br/har
+
+Where the training data for this project are available here:<br />
+* https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv 
+
+### As well as data available for testing:
+* https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv 
+
+```{r}
+   data_dir <- 'F:/Courses/JHopkins/PracticalMachineLearning/Project/Data';
+```
+
+Make sure the "./Data" directory exists, it does not ask for user the path of your data directory. If the user enters an invalid directory path stops execution of the current expression and executes an error action.
+```{r}
+   if (!file.exists(data_dir)){
+        data_dir <-"./Data" ## simulate a valid data entry just because we use a Rmd
+        if (!file.exists(data_dir)){
+                stop("You inform a invalid directory path")
+        }
+   }
+```
+
+
+```{r}
+trainingLink <- getURL("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+# Load and prepare the data from the local storage
+pml_CSV  <- read.csv(text = trainingLink, 
+                     header=TRUE, 
+                     sep=",", 
+                     na.strings=c("NA","")
+                     )
+
+pml_CSV <- pml_CSV[,-1] # Remove the first column that represents a ID Row
+
+```
+
+## Data Sets Partitions Definitions
+Create the data partitions of training and validating data sets.
+```{r}
+inTrain = createDataPartition(pml_CSV$classe, p=0.60, list=FALSE)
+training = pml_CSV[inTrain,]
+validating = pml_CSV[-inTrain,]
+
+# number of rows and columns of data in the training set
+
+dim(training)
+
+# number of rows and columns of data in the validating set
+
+dim(validating)
+```
+
+
+
+```{r}
+# Number of cols with less than 60% of data
+sum((colSums(!is.na(training[,-ncol(training)])) < 0.6*nrow(training)))
+```
+
+```{r}
+# apply our definition of remove columns that most doesn't have data, before its apply to the model.
+
+Keep <- c((colSums(!is.na(training[,-ncol(training)])) >= 0.6*nrow(training)))
+training   <-  training[,Keep]
+validating <- validating[,Keep]
+
+# number of rows and columns of data in the final training set
+
+dim(training)
+```
+
+```{r}
+# number of rows and columns of data in the final validating set
+
+dim(validating)
+```
+
+
+```{r}
+model <- randomForest(classe~.,data=training)
+print(model)
+```
+
+```{r}
+importance(model)
+```
+```{r}
+confusionMatrix(predict(model,newdata=validating[,-ncol(validating)]),validating$classe)
+```
+
+```{r}
+accuracy <-c(as.numeric(predict(model,newdata=validating[,-ncol(validating)])==validating$classe))
+
+accuracy <-sum(accuracy)*100/nrow(validating)
+```
+Precision model as tested over Validation set = = <b>`r format(accurancy, digits = 8)`</b>%.
+
+
+
+
+# Getting the data via the Web to perform the data set.
+```{r}
+  fileURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv" 
+  fileSource <-"pml-testing.csv"
+  source_path <- paste(data_dir, "/", fileSource , sep="")
+  txt_file <- paste(data_dir, "/", fileSource, sep="")
+
+          if (!file.exists(txt_file)) {
+              message(paste("Please Wait! Download...", fileURL, "..."));
+              download.file(fileURL, destfile=source_path);
+        }
+  pml_CSV <- read.csv(txt_file, header=TRUE, sep=",", na.strings=c("NA",""))
+
+
+
+pml_CSV <- read.csv(text = txt_file, header=TRUE, sep=",", na.strings=c("NA",""))
+pml_CSV <- pml_CSV[,-1] # Remove the first column that represents a ID Row
+pml_CSV <- pml_CSV[ , Keep] # Keep the same columns of testing dataset
+pml_CSV <- pml_CSV[,-ncol(pml_CSV)] # Remove the problem ID
+
+# Apply the Same Transformations and Coerce Testing Dataset
+
+# Coerce testing dataset to same class and strucuture of training dataset 
+testing <- rbind(training[100, -59] , pml_CSV) 
+# Apply the ID Row to row.names and 100 for dummy row from testing dataset 
+row.names(testing) <- c(100, 1:20)
+```
+
+
+## Predicting the data sets that are performed test
+```{r}
+predictions <- predict(model,newdata=testing[-1,])
+print(predictions)
+```
+
+## Generates .txt files with the answers of tests performed.
+```{r}
+destDir = "./output"
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0(destDir, "/", "problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(predictions)
+```
+
+
+```{r}
+# Schedule that ends the execution of the project
+End_Time <- Sys.time ()
+```
+# {.references}
+<br /><br />
+
+# {.difftime}
+The analysis was completed on `r format(Sys.time(), "%a %b %d %X %Y")`  in `r round(difftime(End_Time, startTime, units = c( "secs")),0)` seconds.
+
+# {.referencesbody}
+© 2000 - 2015 : Copyright 2015 - [Macedo, Glener Diniz](http://www.facebook.com/gdmacedo/) - All rights reserved.<br /><br />
